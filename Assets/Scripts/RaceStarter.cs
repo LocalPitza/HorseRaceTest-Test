@@ -1,11 +1,11 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using TMPro;
+using UnityEngine.UI;
 public class RaceStarter : MonoBehaviour
 {
     [Header("References")]
-    public TMP_Text countdownText;
+    public Text countdownText;
     public GameObject startingBarrier;
     public AudioSource countdownAudio;
     public AudioSource raceStartAudio;

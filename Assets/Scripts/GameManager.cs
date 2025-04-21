@@ -2,7 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 using System.Linq;
 using UnityEngine.SceneManagement;
 
@@ -17,7 +16,7 @@ public class GameManager : MonoBehaviour
     public Image fadeOverlay;
     public RectTransform winPopup;
     public Image winnerHorseDisplay;
-    public TMP_Text winnerText;
+    public Text winnerText;
     public float fadeDuration = 1f;
     public float popupDelay = 0.3f;
     public float popupAnimationDuration = 0.75f;
@@ -26,9 +25,14 @@ public class GameManager : MonoBehaviour
     public GameObject raceBGM;
 
     [Header("UI Elements")]
-    public TMP_Text timerText; // Add this with other UI references
+    public Text timerText; // Add this with other UI references
     private float raceTime;
     private bool timerRunning;
+    [Header("Countdown Settings")]
+    public float countdownDuration = 60; // Default 60 seconds countdown
+    public bool isCountingDown = false;
+    private float countdownTimer = 60;
+    public Text countdownText;
 
     
     private bool raceFinished = false;
@@ -39,13 +43,41 @@ public class GameManager : MonoBehaviour
         timerText.text = "00:00:000";
         timerRunning = false;
     }
+    public void StartCountdown()
+    {
+        countdownTimer = countdownDuration;
+        isCountingDown = true;
+        
+        if (countdownText != null)
+            countdownText.gameObject.SetActive(true);
+    }
+
     void Update()
     {
-
         if (timerRunning)
         {
             raceTime += Time.deltaTime;
             UpdateTimerDisplay();
+        }
+        
+        if (isCountingDown)
+        {
+            countdownTimer -= Time.deltaTime;
+            
+            if (countdownText != null)
+            {
+                int seconds = Mathf.CeilToInt(countdownTimer);
+                countdownText.text = seconds.ToString();
+            }
+            
+            // When countdown reaches zero, start the race
+            if (countdownTimer <= 0)
+            {
+                isCountingDown = false;            
+                UnityEngine.SceneManagement.SceneManager.LoadScene(
+                    UnityEngine.SceneManagement.SceneManager.GetActiveScene().name
+                );
+            }
         }
         
         if (raceFinished && Input.GetKeyDown(KeyCode.R))
@@ -109,7 +141,8 @@ public class GameManager : MonoBehaviour
     {
         raceBGM.gameObject.SetActive(false);
         StopRaceTimer();
-
+        isCountingDown = true;
+        
         foreach (Horse horse in horses)
         {
             horse.canMove = false;
