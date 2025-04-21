@@ -6,6 +6,14 @@ TagManager:
   tags:
   - Wall
   - Horse
+  - FadeOverlay
+  - WinPopup
+  - WinningHorseDisplay
+  - WinnerText
+  - TimerText
+  - ScoreboardText
+  - ScoreboardPanel
+  - RaceBGM
   layers:
   - Default
   - TransparentFX

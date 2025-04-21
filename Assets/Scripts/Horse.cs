@@ -24,7 +24,7 @@ public class Horse : MonoBehaviour
     public AudioSource audioSource;
     
     [HideInInspector] public bool canMove = false;
-    private bool hasWon = false;
+    public bool hasWon = false;
     private float directionTimer = 0f;
 
     void Start()

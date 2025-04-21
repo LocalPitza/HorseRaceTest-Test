@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using TMPro;
 using System.Linq;
 using UnityEngine.SceneManagement;
+
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance;
@@ -24,31 +25,37 @@ public class GameManager : MonoBehaviour
     public AudioClip popupSound;
     public GameObject raceBGM;
 
-    [Header("Restart Settings")]
-    public float autoRestartDelay = 10f;
-    private float lastInteractionTime;
-    private bool waitingForResetConfirmation = false;
-
     [Header("UI Elements")]
     public TMP_Text timerText; // Add this with other UI references
     private float raceTime;
     private bool timerRunning;
 
-    [Header("Scoreboard Settings")]
-    public TMP_Text scoreboardText;
-    public RectTransform scoreboardPanel;
-    private static Dictionary<string, (int wins, int races)> persistentHorseStats = 
-        new Dictionary<string, (int, int)>();
-
+    
     private bool raceFinished = false;
     private AudioSource audioSource;
-
     void Start()
     {
-        UpdateScoreboard();
+        // Add this with other initialization
         timerText.text = "00:00:000";
         timerRunning = false;
     }
+    void Update()
+    {
+
+        if (timerRunning)
+        {
+            raceTime += Time.deltaTime;
+            UpdateTimerDisplay();
+        }
+        
+        if (raceFinished && Input.GetKeyDown(KeyCode.R))
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene(
+                UnityEngine.SceneManagement.SceneManager.GetActiveScene().name
+            );
+        }
+    }
+
     void Awake()
     {
         if (Instance == null)
@@ -62,15 +69,23 @@ public class GameManager : MonoBehaviour
         
         audioSource = GetComponent<AudioSource>();
         ResetWinScreen();
-        if (persistentHorseStats.Count == 0)
-        {
-            InitializeScoreboard();
-        }
-        else
-        {
-            horseStats = new Dictionary<string, (int, int)>(persistentHorseStats);
-        }
-        UpdateScoreboard();
+    }
+    void UpdateTimerDisplay()
+    {
+        int minutes = Mathf.FloorToInt(raceTime / 60);
+        int seconds = Mathf.FloorToInt(raceTime % 60);
+        int milliseconds = Mathf.FloorToInt((raceTime * 1000) % 1000);
+        timerText.text = string.Format("{0:00}:{1:00}:{2:000}", minutes, seconds, milliseconds);
+    }
+    public void StartRaceTimer()
+    {
+        raceTime = 0f;
+        timerRunning = true;
+    }
+
+    public void StopRaceTimer()
+    {
+        timerRunning = false;
     }
 
     void ResetWinScreen()
@@ -81,45 +96,6 @@ public class GameManager : MonoBehaviour
         winPopup.gameObject.SetActive(false);
         winnerText.gameObject.SetActive(false);
     }
-    void InitializeScoreboard()
-    {
-        foreach (Horse horse in horses)
-        {
-            if (!horseStats.ContainsKey(horse.name))
-            {
-                horseStats.Add(horse.name, (0, 0));
-            }
-        }
-    }
-    void UpdateScoreboard()
-    {
-        System.Text.StringBuilder sb = new System.Text.StringBuilder();
-        sb.AppendLine("<b>HORSE STATS</b>");
-        sb.AppendLine("----------------");
-        
-        foreach (var stat in horseStats)
-        {
-            float ratio = stat.Value.races > 0 ? 
-                (float)stat.Value.wins / stat.Value.races : 0f;
-            sb.AppendLine($"{stat.Key}: {stat.Value.wins}-{stat.Value.races - stat.Value.wins} | {ratio:P0}");
-        }
-        
-        scoreboardText.text = sb.ToString();
-    }
-    public void RecordRaceResult(string winnerName)
-    {
-        foreach (var horse in horseStats.Keys.ToList())
-        {
-            horseStats[horse] = (horseStats[horse].wins, horseStats[horse].races + 1);
-        }
-        
-        if (horseStats.ContainsKey(winnerName))
-        {
-            horseStats[winnerName] = (horseStats[winnerName].wins + 1, horseStats[winnerName].races);
-        }
-        
-        UpdateScoreboard();
-    }
 
     public void HorseWon(Horse winningHorse)
     {
@@ -128,11 +104,12 @@ public class GameManager : MonoBehaviour
         raceFinished = true;
         StartCoroutine(WinningSequence(winningHorse));
     }
+
     IEnumerator WinningSequence(Horse winningHorse)
     {
+        raceBGM.gameObject.SetActive(false);
         StopRaceTimer();
-        RecordRaceResult(winningHorse.name);
-        // Stop all horses
+
         foreach (Horse horse in horses)
         {
             horse.canMove = false;
@@ -183,7 +160,6 @@ public class GameManager : MonoBehaviour
             if (popupSound != null && audioSource != null)
             {
                 audioSource.PlayOneShot(popupSound);
-                raceBGM.gameObject.SetActive(false);
             }
 
             // Animate popup
@@ -196,15 +172,10 @@ public class GameManager : MonoBehaviour
                 yield return null;
             }
             winPopup.localScale = Vector3.one;
-            lastInteractionTime = Time.time;
 
             // Add restart option
-
-            yield return new WaitForSeconds(autoRestartDelay - 5f);
-            if (raceFinished) // Only if still in finished state
-            {
-                winnerText.text += $"\nRestarting in 5 seconds... or press R";
-            }
+            yield return new WaitForSeconds(1f);
+            winnerText.text += "\nPress R to Restart";
         }
         else
         {
@@ -219,71 +190,14 @@ public class GameManager : MonoBehaviour
         float c3 = c1 + 1f;
         return 1 + c3 * Mathf.Pow(t - 1, 3) + c1 * Mathf.Pow(t - 1, 2);
     }
-
-    void Update()
+    public void ResetRace()
     {
-        if (timerRunning)
+        // Alternative reset logic if not reloading scene
+        raceFinished = false;
+        ResetWinScreen();
+        foreach (Horse horse in horses)
         {
-            raceTime += Time.deltaTime;
-            UpdateTimerDisplay();
+            //horse.ResetHorse();
         }
-
-        if (raceFinished && Time.time - lastInteractionTime > autoRestartDelay)
-        {
-            RestartRace();
-        }
-
-        // Reset confirmation handling
-        if (Input.GetKeyDown(KeyCode.R) && raceFinished)
-        {
-            if (!waitingForResetConfirmation)
-            {
-                winnerText.text = "Press R again to confirm reset";
-                waitingForResetConfirmation = true;
-                lastInteractionTime = Time.time; // Reset the auto-restart timer
-            }
-            else
-            {
-                ResetScoreboard();
-                RestartRace();
-            }
-        }
-        else if (Input.anyKeyDown)
-        {
-            lastInteractionTime = Time.time; // Reset idle timer on any key press
-        }
-    }
-
-    public void RestartRace()
-    {
-        // Save stats before reloading
-        persistentHorseStats = new Dictionary<string, (int, int)>(horseStats);
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-    }
-    void ResetScoreboard()
-    {
-        persistentHorseStats.Clear();
-        horseStats.Clear();
-        InitializeScoreboard();
-        UpdateScoreboard();
-        waitingForResetConfirmation = false;
-    }
-    void UpdateTimerDisplay()
-    {
-        int minutes = Mathf.FloorToInt(raceTime / 60);
-        int seconds = Mathf.FloorToInt(raceTime % 60);
-        int milliseconds = Mathf.FloorToInt((raceTime * 1000) % 1000);
-        timerText.text = string.Format("{0:00}:{1:00}:{2:000}", minutes, seconds, milliseconds);
-    }
-
-    public void StartRaceTimer()
-    {
-        raceTime = 0f;
-        timerRunning = true;
-    }
-
-    public void StopRaceTimer()
-    {
-        timerRunning = false;
     }
 }
